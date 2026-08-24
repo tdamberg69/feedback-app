@@ -17,21 +17,12 @@ export async function GET(
     // dort unzuverlässig leere Ergebnisse). Stattdessen alles laden und in
     // JS filtern - bei der zu erwartenden Datenmenge unproblematisch.
     const rows = await sql`
-      select id, topic_id, content, created_at
+      select id, topic_id, content, rating, created_at
       from feedback_entries
       order by created_at desc
     `;
     const filtered = rows.filter((r: any) => r.topic_id === params.id);
-    return NextResponse.json(filtered, {
-      headers: {
-        "Cache-Control": "no-store",
-        "X-Debug-Params-Id": params.id,
-        "X-Debug-Total-Rows": String(rows.length),
-        "X-Debug-Sample-Topic-Ids": JSON.stringify(
-          rows.slice(0, 5).map((r: any) => r.topic_id)
-        ),
-      },
-    });
+    return NextResponse.json(filtered, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     console.error(err);
     return NextResponse.json(

@@ -9,18 +9,30 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Nicht autorisiert." }, { status: 401 });
   }
   try {
-    const rows = await sql`
-      select t.id, t.title, t.description, t.link_key, t.active,
-             t.emoji_rating_enabled, t.emoji_unsure_enabled, t.created_at,
-             count(f.id)::int as feedback_count,
-             count(f.id) filter (where f.rating = 'up')::int as up_count,
-             count(f.id) filter (where f.rating = 'down')::int as down_count,
-             count(f.id) filter (where f.rating = 'unsure')::int as unsure_count
-      from feedback_topics t
-      left join feedback_entries f on f.topic_id = t.id
-      group by t.id
-      order by t.created_at desc
+    // Bewusst OHNE SQL-JOIN/GROUP BY - die Erfahrung in dieser Datenbank
+    // zeigt, dass solche kombinierten Abfragen unzuverlässig falsche
+    // Ergebnisse liefern können. Stattdessen getrennt laden und in JS zählen.
+    const topics = await sql`
+      select id, title, description, link_key, active,
+             emoji_rating_enabled, emoji_unsure_enabled, created_at
+      from feedback_topics
+      order by created_at desc
     `;
+    const allEntries = await sql`
+      select id, topic_id, rating from feedback_entries
+    `;
+
+    const rows = topics.map((t: any) => {
+      const entries = allEntries.filter((e: any) => e.topic_id === t.id);
+      return {
+        ...t,
+        feedback_count: entries.length,
+        up_count: entries.filter((e: any) => e.rating === "up").length,
+        down_count: entries.filter((e: any) => e.rating === "down").length,
+        unsure_count: entries.filter((e: any) => e.rating === "unsure").length,
+      };
+    });
+
     return NextResponse.json(rows, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     console.error(err);
