@@ -12,13 +12,17 @@ export async function GET(
     return NextResponse.json({ error: "Nicht autorisiert." }, { status: 401 });
   }
   try {
+    // Bewusst ohne WHERE-Bedingung in SQL (siehe Erfahrung aus der
+    // Hockey-App: eine kombinierte/parametrisierte WHERE-Klausel lieferte
+    // dort unzuverlässig leere Ergebnisse). Stattdessen alles laden und in
+    // JS filtern - bei der zu erwartenden Datenmenge unproblematisch.
     const rows = await sql`
       select id, topic_id, content, created_at
       from feedback_entries
-      where topic_id = ${params.id}
       order by created_at desc
     `;
-    return NextResponse.json(rows, { headers: { "Cache-Control": "no-store" } });
+    const filtered = rows.filter((r: any) => r.topic_id === params.id);
+    return NextResponse.json(filtered, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     console.error(err);
     return NextResponse.json(
