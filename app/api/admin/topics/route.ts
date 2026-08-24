@@ -9,17 +9,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Nicht autorisiert." }, { status: 401 });
   }
   try {
-    // Bewusst OHNE SQL-JOIN/GROUP BY - die Erfahrung in dieser Datenbank
-    // zeigt, dass solche kombinierten Abfragen unzuverlässig falsche
-    // Ergebnisse liefern können. Stattdessen getrennt laden und in JS zählen.
+    // Bewusst OHNE SQL-JOIN/GROUP BY, und mit dynamischem Cache-Buster in
+    // der WHERE-Klausel - vermeidet sowohl unzuverlässige Aggregation als
+    // auch mögliches Caching zwischen Server und Datenbank.
+    const cacheBuster = Date.now();
     const topics = await sql`
       select id, title, description, link_key, active,
              emoji_rating_enabled, emoji_unsure_enabled, created_at
       from feedback_topics
+      where ${cacheBuster}::bigint > 0
       order by created_at desc
     `;
     const allEntries = await sql`
       select id, topic_id, rating from feedback_entries
+      where ${cacheBuster}::bigint > 0
     `;
 
     const rows = topics.map((t: any) => {

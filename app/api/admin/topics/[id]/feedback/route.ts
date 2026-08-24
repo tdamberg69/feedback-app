@@ -16,9 +16,15 @@ export async function GET(
     // Hockey-App: eine kombinierte/parametrisierte WHERE-Klausel lieferte
     // dort unzuverlässig leere Ergebnisse). Stattdessen alles laden und in
     // JS filtern - bei der zu erwartenden Datenmenge unproblematisch.
+    // Zusätzlich zum Cache-Busting zwischen Browser und Server jetzt auch
+    // die Abfrage selbst bei jedem Aufruf eindeutig machen, falls irgendwo
+    // zwischen unserem Server und der Datenbank (Treiber, Verbindungs-Pooling
+    // o.ä.) eine identische Abfrage gecacht werden könnte.
+    const cacheBuster = Date.now();
     const rows = await sql`
       select id, topic_id, content, rating, created_at
       from feedback_entries
+      where ${cacheBuster}::bigint > 0
       order by created_at desc
     `;
     const filtered = rows.filter((r: any) => r.topic_id === params.id);
