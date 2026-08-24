@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #F7F5F2;
+  color: #241F2E;
+  font-family: 'Inter', sans-serif;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(36,31,46,0.05) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+::selection {
+  background-color: #E8B84B;
+  color: #241F2E;
+}
+
+button, a, input, select, textarea, label {
+  transition: background-color 150ms ease, border-color 150ms ease,
+    color 150ms ease, box-shadow 150ms ease, transform 150ms ease,
+    opacity 150ms ease !important;
+}
+button:active:not(:disabled) {
+  transform: scale(0.96) !important;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.35s ease backwards;
+}
+.animate-fade-in {
+  animation: fadeIn 0.4s ease;
+}
+
+.card-hover {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.card-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 0 rgba(36,31,46,0.08);
+}
+
+.spinner {
+  border: 2px solid rgba(36,31,46,0.15);
+  border-top-color: #56398C;
+  border-radius: 9999px;
+  width: 18px;
+  height: 18px;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+* {
+  min-width: 0;
+}
