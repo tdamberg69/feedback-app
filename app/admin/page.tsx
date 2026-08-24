@@ -118,7 +118,7 @@ export default function AdminPage() {
 
   async function fetchTopics() {
     try {
-      const data = await apiFetch("/api/admin/topics");
+      const data = await apiFetch(`/api/admin/topics?_=${Date.now()}`);
       setTopics(data ?? []);
       setTopicsError(null);
     } catch (err: any) {
@@ -132,7 +132,7 @@ export default function AdminPage() {
   async function fetchFeedback(topicId: string) {
     setLoadingFeedback(true);
     try {
-      const data = await apiFetch(`/api/admin/topics/${topicId}/feedback`);
+      const data = await apiFetch(`/api/admin/topics/${topicId}/feedback?_=${Date.now()}`);
       setFeedbackEntries(data ?? []);
       setFeedbackError(null);
     } catch (err: any) {
