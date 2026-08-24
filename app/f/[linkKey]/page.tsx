@@ -6,11 +6,11 @@ import { AlertTriangle, PauseCircle, Send, CheckCircle2 } from "lucide-react";
 
 type PublicTopic = {
   id: string;
-  title: string;
-  description: string | null;
+  title?: string;
+  description?: string | null;
   active: boolean;
-  emoji_rating_enabled: boolean;
-  emoji_unsure_enabled: boolean;
+  emoji_rating_enabled?: boolean;
+  emoji_unsure_enabled?: boolean;
 };
 
 type Rating = "up" | "down" | "unsure";
@@ -116,6 +116,19 @@ export default function FeedbackPage() {
     (r) => r.value !== "unsure" || topic.emoji_unsure_enabled
   );
 
+  if (!topic.active) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-5">
+        <div className="max-w-sm text-center animate-fade-in-up">
+          <PauseCircle className="mx-auto mb-3 text-plum-500" size={28} />
+          <p className="text-ink/70 text-sm">
+            Die Sammlung von Feedback für dieses Thema ist aktuell inaktiv.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen max-w-xl mx-auto px-5 py-14 md:py-20 animate-fade-in">
       <header className="mb-8">
@@ -130,15 +143,7 @@ export default function FeedbackPage() {
         )}
       </header>
 
-      {!topic.active ? (
-        <div className="rounded-card border border-plum-100 bg-plum-50 px-5 py-6 text-center animate-fade-in-up">
-          <PauseCircle className="mx-auto mb-2 text-plum-500" size={24} />
-          <p className="text-ink/70 text-sm">
-            Dieses Thema nimmt aktuell kein Feedback entgegen. Versuch es
-            gerne später noch einmal.
-          </p>
-        </div>
-      ) : submitted ? (
+      {submitted ? (
         <div className="rounded-card border border-plum-100 bg-plum-50 px-5 py-6 text-center animate-fade-in-up">
           <CheckCircle2 className="mx-auto mb-2 text-plum-500" size={24} />
           <p className="text-ink font-medium mb-1">Danke für dein Feedback!</p>

@@ -19,7 +19,19 @@ export async function GET(
         { status: 404 }
       );
     }
-    return NextResponse.json(rows[0], { headers: { "Cache-Control": "no-store" } });
+    const topic = rows[0];
+
+    // Bei inaktivem Thema werden Titel/Beschreibung bewusst NICHT
+    // mitgeschickt - nicht nur im Frontend versteckt, sondern hier schon
+    // ausgelassen, damit sie auch über die Netzwerk-Antwort nicht sichtbar sind.
+    if (!topic.active) {
+      return NextResponse.json(
+        { id: topic.id, active: false },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    return NextResponse.json(topic, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Datenbankfehler." }, { status: 500 });
