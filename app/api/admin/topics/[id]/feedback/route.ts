@@ -22,7 +22,15 @@ export async function GET(
       order by created_at desc
     `;
     const filtered = rows.filter((r: any) => r.topic_id === params.id);
-    return NextResponse.json(filtered, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(filtered, {
+      headers: {
+        "Cache-Control": "no-store",
+        "X-Debug-Raw-Count": String(rows.length),
+        "X-Debug-Filtered-Count": String(filtered.length),
+        "X-Debug-Params-Id": params.id,
+        "X-Debug-All-Topic-Ids": JSON.stringify(rows.map((r: any) => r.topic_id)),
+      },
+    });
   } catch (err) {
     console.error(err);
     return NextResponse.json(
