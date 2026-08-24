@@ -21,15 +21,27 @@ type Topic = {
   description: string | null;
   link_key: string;
   active: boolean;
+  emoji_rating_enabled: boolean;
+  emoji_unsure_enabled: boolean;
   created_at: string;
   feedback_count: number;
+  up_count: number;
+  down_count: number;
+  unsure_count: number;
 };
 
 type FeedbackEntry = {
   id: string;
   topic_id: string;
-  content: string;
+  content: string | null;
+  rating: "up" | "down" | "unsure" | null;
   created_at: string;
+};
+
+const RATING_EMOJI: Record<string, string> = {
+  up: "👍",
+  down: "👎",
+  unsure: "😐",
 };
 
 function formatDateTimeDE(iso: string): string {
@@ -67,12 +79,16 @@ export default function AdminPage() {
 
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  const [newEmojiEnabled, setNewEmojiEnabled] = useState(false);
+  const [newEmojiUnsure, setNewEmojiUnsure] = useState(false);
   const [addingTopic, setAddingTopic] = useState(false);
   const [addTopicError, setAddTopicError] = useState<string | null>(null);
 
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editEmojiEnabled, setEditEmojiEnabled] = useState(false);
+  const [editEmojiUnsure, setEditEmojiUnsure] = useState(false);
   const [savingTopic, setSavingTopic] = useState(false);
 
   const [confirmDeleteTopicId, setConfirmDeleteTopicId] = useState<string | null>(
@@ -167,10 +183,14 @@ export default function AdminPage() {
         body: JSON.stringify({
           title: newTitle.trim(),
           description: newDescription.trim() || null,
+          emoji_rating_enabled: newEmojiEnabled,
+          emoji_unsure_enabled: newEmojiEnabled && newEmojiUnsure,
         }),
       });
       setNewTitle("");
       setNewDescription("");
+      setNewEmojiEnabled(false);
+      setNewEmojiUnsure(false);
       fetchTopics();
     } catch (err: any) {
       setAddTopicError(err.message);
@@ -182,6 +202,8 @@ export default function AdminPage() {
     setEditingTopicId(t.id);
     setEditTitle(t.title);
     setEditDescription(t.description ?? "");
+    setEditEmojiEnabled(t.emoji_rating_enabled);
+    setEditEmojiUnsure(t.emoji_unsure_enabled);
   }
 
   async function saveEditTopic(id: string) {
@@ -193,6 +215,8 @@ export default function AdminPage() {
         body: JSON.stringify({
           title: editTitle.trim(),
           description: editDescription.trim() || null,
+          emoji_rating_enabled: editEmojiEnabled,
+          emoji_unsure_enabled: editEmojiEnabled && editEmojiUnsure,
         }),
       });
       setEditingTopicId(null);
@@ -273,12 +297,19 @@ export default function AdminPage() {
       topic.description ? topic.description : "",
       "",
       `${entries.length} Feedback(s)`,
-      "=".repeat(40),
-      "",
     ];
+    if (topic.emoji_rating_enabled) {
+      lines.push(
+        `👍 ${topic.up_count}   👎 ${topic.down_count}${
+          topic.emoji_unsure_enabled ? `   😐 ${topic.unsure_count}` : ""
+        }`
+      );
+    }
+    lines.push("=".repeat(40), "");
     entries.forEach((f, i) => {
-      lines.push(`#${i + 1} - ${formatDateTimeDE(f.created_at)}`);
-      lines.push(f.content);
+      const ratingLabel = f.rating ? ` ${RATING_EMOJI[f.rating]}` : "";
+      lines.push(`#${i + 1} - ${formatDateTimeDE(f.created_at)}${ratingLabel}`);
+      if (f.content) lines.push(f.content);
       lines.push("");
       lines.push("-".repeat(40));
       lines.push("");
@@ -303,11 +334,18 @@ export default function AdminPage() {
       .map(
         (f) => `
       <li class="entry">
-        <p class="content">${escapeHtml(f.content).replace(/\n/g, "<br>")}</p>
+        ${f.rating ? `<p class="rating">${RATING_EMOJI[f.rating]}</p>` : ""}
+        ${f.content ? `<p class="content">${escapeHtml(f.content).replace(/\n/g, "<br>")}</p>` : ""}
         <p class="meta">${formatDateTimeDE(f.created_at)}</p>
       </li>`
       )
       .join("\n");
+
+    const summary = topic.emoji_rating_enabled
+      ? `<p class="summary">👍 ${topic.up_count} &nbsp; 👎 ${topic.down_count}${
+          topic.emoji_unsure_enabled ? ` &nbsp; 😐 ${topic.unsure_count}` : ""
+        }</p>`
+      : "";
 
     const html = `<!DOCTYPE html>
 <html lang="de">
@@ -321,14 +359,17 @@ export default function AdminPage() {
   .count { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #7A5AB8; margin: 24px 0 12px; }
   ul { list-style: none; padding: 0; margin: 0; }
   .entry { background: #fff; border: 1px solid #E1D7EF; border-radius: 8px; padding: 16px; margin-bottom: 10px; }
+  .rating { font-size: 22px; margin: 0 0 6px; }
   .content { margin: 0 0 8px; white-space: pre-wrap; }
   .meta { margin: 0; font-size: 11px; color: #241F2E66; font-family: monospace; }
+  .summary { font-size: 20px; margin: 8px 0 20px; }
 </style>
 </head>
 <body>
   <h1>${escapeHtml(topic.title)}</h1>
   ${topic.description ? `<p class="description">${escapeHtml(topic.description).replace(/\n/g, "<br>")}</p>` : ""}
   <p class="count">${entries.length} Feedback(s)</p>
+  ${summary}
   <ul>
     ${items || "<li>Kein Feedback vorhanden.</li>"}
   </ul>
@@ -419,6 +460,26 @@ export default function AdminPage() {
                 rows={3}
                 className="w-full rounded-card border border-plum-300 bg-white px-3 py-2 text-sm"
               />
+              <label className="flex items-center gap-2 text-xs text-ink/70 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={newEmojiEnabled}
+                  onChange={(e) => setNewEmojiEnabled(e.target.checked)}
+                  className="accent-plum-700"
+                />
+                Emoji-Bewertung erlauben (👍/👎) - macht Text optional
+              </label>
+              {newEmojiEnabled && (
+                <label className="flex items-center gap-2 text-xs text-ink/70 pl-5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newEmojiUnsure}
+                    onChange={(e) => setNewEmojiUnsure(e.target.checked)}
+                    className="accent-plum-700"
+                  />
+                  Auch &bdquo;Unsicher&ldquo; (😐) anbieten
+                </label>
+              )}
               {addTopicError && (
                 <p className="text-xs text-alert">{addTopicError}</p>
               )}
@@ -454,6 +515,26 @@ export default function AdminPage() {
                       rows={2}
                       className="w-full rounded-card border border-plum-300 px-2.5 py-1.5 text-sm"
                     />
+                    <label className="flex items-center gap-2 text-xs text-ink/70 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={editEmojiEnabled}
+                        onChange={(e) => setEditEmojiEnabled(e.target.checked)}
+                        className="accent-plum-700"
+                      />
+                      Emoji-Bewertung erlauben (👍/👎)
+                    </label>
+                    {editEmojiEnabled && (
+                      <label className="flex items-center gap-2 text-xs text-ink/70 pl-5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={editEmojiUnsure}
+                          onChange={(e) => setEditEmojiUnsure(e.target.checked)}
+                          className="accent-plum-700"
+                        />
+                        Auch &bdquo;Unsicher&ldquo; (😐) anbieten
+                      </label>
+                    )}
                     <div className="flex gap-2">
                       <button
                         onClick={() => saveEditTopic(t.id)}
@@ -491,8 +572,15 @@ export default function AdminPage() {
                         {t.active ? "Aktiv" : "Inaktiv"}
                       </span>
                     </div>
-                    <p className="text-xs text-ink/40 font-mono mt-1">
-                      {t.feedback_count} Feedback(s)
+                    <p className="text-xs text-ink/40 font-mono mt-1 flex items-center gap-2">
+                      <span>{t.feedback_count} Feedback(s)</span>
+                      {t.emoji_rating_enabled &&
+                        (t.up_count > 0 || t.down_count > 0 || t.unsure_count > 0) && (
+                          <span>
+                            👍{t.up_count} 👎{t.down_count}
+                            {t.emoji_unsure_enabled ? ` 😐${t.unsure_count}` : ""}
+                          </span>
+                        )}
                     </p>
                   </button>
                 )}
@@ -518,6 +606,19 @@ export default function AdminPage() {
                     {selectedTopic.description && (
                       <p className="text-ink/60 text-sm mt-1 whitespace-pre-wrap">
                         {selectedTopic.description}
+                      </p>
+                    )}
+                    {selectedTopic.emoji_rating_enabled && (
+                      <p className="text-xl mt-2">
+                        👍 {selectedTopic.up_count}
+                        <span className="mx-2" />
+                        👎 {selectedTopic.down_count}
+                        {selectedTopic.emoji_unsure_enabled && (
+                          <>
+                            <span className="mx-2" />
+                            😐 {selectedTopic.unsure_count}
+                          </>
+                        )}
                       </p>
                     )}
                   </div>
@@ -635,9 +736,14 @@ export default function AdminPage() {
                         className="card-hover animate-fade-in-up bg-white border border-plum-100 rounded-card p-4"
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <p className="text-sm whitespace-pre-wrap flex-1">
-                            {f.content}
-                          </p>
+                          <div className="flex-1">
+                            {f.rating && (
+                              <p className="text-xl mb-1">{RATING_EMOJI[f.rating]}</p>
+                            )}
+                            {f.content && (
+                              <p className="text-sm whitespace-pre-wrap">{f.content}</p>
+                            )}
+                          </div>
                           {confirmDeleteFeedbackId === f.id ? (
                             <div className="flex items-center gap-1.5 shrink-0">
                               <button

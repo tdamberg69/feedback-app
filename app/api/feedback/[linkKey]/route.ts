@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, RATING_VALUES } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const rows = await sql`
-      select id, title, description, active
+      select id, title, description, active, emoji_rating_enabled, emoji_unsure_enabled
       from feedback_topics
       where link_key = ${params.linkKey}
     `;
@@ -32,7 +32,8 @@ export async function POST(
 ) {
   try {
     const topicRows = await sql`
-      select id, active from feedback_topics where link_key = ${params.linkKey}
+      select id, active, emoji_rating_enabled, emoji_unsure_enabled
+      from feedback_topics where link_key = ${params.linkKey}
     `;
     const topic = topicRows[0];
     if (!topic) {
@@ -49,16 +50,31 @@ export async function POST(
     }
 
     const body = await req.json();
-    const content: string = (body.content ?? "").trim();
-    if (!content) {
-      return NextResponse.json({ error: "Feedback darf nicht leer sein." }, { status: 400 });
+    const content: string | null = (body.content ?? "").trim() || null;
+
+    let rating: string | null = null;
+    if (topic.emoji_rating_enabled && body.rating) {
+      if (!(RATING_VALUES as readonly string[]).includes(body.rating)) {
+        return NextResponse.json({ error: "Ungültige Bewertung." }, { status: 400 });
+      }
+      if (body.rating === "unsure" && !topic.emoji_unsure_enabled) {
+        return NextResponse.json({ error: "Ungültige Bewertung." }, { status: 400 });
+      }
+      rating = body.rating;
     }
 
-    // Bewusst: es wird NICHTS außer Text + Zeitstempel gespeichert -
-    // keine IP, keine Kennung, kein Bezug zum Absender.
+    // Mindestens Text ODER (falls aktiviert) eine Emoji-Bewertung nötig.
+    if (!content && !rating) {
+      return NextResponse.json(
+        { error: "Bitte Feedback eingeben oder eine Bewertung auswählen." },
+        { status: 400 }
+      );
+    }
+
+    // Bewusst: es wird NICHTS außer Text/Bewertung + Zeitstempel gespeichert.
     await sql`
-      insert into feedback_entries (topic_id, content)
-      values (${topic.id}, ${content})
+      insert into feedback_entries (topic_id, content, rating)
+      values (${topic.id}, ${content}, ${rating})
     `;
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {

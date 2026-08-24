@@ -14,7 +14,8 @@ export async function PATCH(
   try {
     const body = await req.json();
     const existingRows = await sql`
-      select id, title, description, link_key, active, created_at
+      select id, title, description, link_key, active,
+             emoji_rating_enabled, emoji_unsure_enabled, created_at
       from feedback_topics where id = ${params.id}
     `;
     const existing = existingRows[0];
@@ -32,12 +33,23 @@ export async function PATCH(
         : body.description?.trim() || null;
     const active: boolean =
       typeof body.active === "boolean" ? body.active : existing.active;
+    const emojiRatingEnabled: boolean =
+      typeof body.emoji_rating_enabled === "boolean"
+        ? body.emoji_rating_enabled
+        : existing.emoji_rating_enabled;
+    const emojiUnsureEnabled: boolean =
+      (typeof body.emoji_unsure_enabled === "boolean"
+        ? body.emoji_unsure_enabled
+        : existing.emoji_unsure_enabled) && emojiRatingEnabled;
 
     const rows = await sql`
       update feedback_topics
-      set title = ${title}, description = ${description}, active = ${active}
+      set title = ${title}, description = ${description}, active = ${active},
+          emoji_rating_enabled = ${emojiRatingEnabled},
+          emoji_unsure_enabled = ${emojiUnsureEnabled}
       where id = ${params.id}
-      returning id, title, description, link_key, active, created_at
+      returning id, title, description, link_key, active,
+                emoji_rating_enabled, emoji_unsure_enabled, created_at
     `;
     return NextResponse.json(rows[0]);
   } catch (err) {

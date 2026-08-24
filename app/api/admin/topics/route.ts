@@ -10,8 +10,12 @@ export async function GET(req: NextRequest) {
   }
   try {
     const rows = await sql`
-      select t.id, t.title, t.description, t.link_key, t.active, t.created_at,
-             count(f.id)::int as feedback_count
+      select t.id, t.title, t.description, t.link_key, t.active,
+             t.emoji_rating_enabled, t.emoji_unsure_enabled, t.created_at,
+             count(f.id)::int as feedback_count,
+             count(f.id) filter (where f.rating = 'up')::int as up_count,
+             count(f.id) filter (where f.rating = 'down')::int as down_count,
+             count(f.id) filter (where f.rating = 'unsure')::int as unsure_count
       from feedback_topics t
       left join feedback_entries f on f.topic_id = t.id
       group by t.id
@@ -35,24 +39,30 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const title: string = (body.title ?? "").trim();
     const description: string | null = body.description?.trim() || null;
+    const emojiRatingEnabled: boolean = !!body.emoji_rating_enabled;
+    const emojiUnsureEnabled: boolean = emojiRatingEnabled && !!body.emoji_unsure_enabled;
 
     if (!title) {
       return NextResponse.json({ error: "Titel ist ein Pflichtfeld." }, { status: 400 });
     }
 
-    // Falls der generierte Schlüssel (praktisch unmöglich) doch schon
-    // existiert, ein paar Mal neu versuchen.
     for (let attempt = 0; attempt < 5; attempt++) {
       const linkKey = generateLinkKey();
       try {
         const rows = await sql`
-          insert into feedback_topics (title, description, link_key)
-          values (${title}, ${description}, ${linkKey})
-          returning id, title, description, link_key, active, created_at
+          insert into feedback_topics
+            (title, description, link_key, emoji_rating_enabled, emoji_unsure_enabled)
+          values
+            (${title}, ${description}, ${linkKey}, ${emojiRatingEnabled}, ${emojiUnsureEnabled})
+          returning id, title, description, link_key, active,
+                    emoji_rating_enabled, emoji_unsure_enabled, created_at
         `;
-        return NextResponse.json({ ...rows[0], feedback_count: 0 }, { status: 201 });
+        return NextResponse.json(
+          { ...rows[0], feedback_count: 0, up_count: 0, down_count: 0, unsure_count: 0 },
+          { status: 201 }
+        );
       } catch (err: any) {
-        if (err?.code === "23505") continue; // Kollision, nochmal versuchen
+        if (err?.code === "23505") continue;
         throw err;
       }
     }

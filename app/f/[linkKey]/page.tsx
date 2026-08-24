@@ -9,7 +9,11 @@ type PublicTopic = {
   title: string;
   description: string | null;
   active: boolean;
+  emoji_rating_enabled: boolean;
+  emoji_unsure_enabled: boolean;
 };
+
+type Rating = "up" | "down" | "unsure";
 
 async function apiFetch(url: string, options?: RequestInit) {
   const res = await fetch(url, {
@@ -24,6 +28,12 @@ async function apiFetch(url: string, options?: RequestInit) {
   return body;
 }
 
+const RATING_OPTIONS: { value: Rating; emoji: string; label: string }[] = [
+  { value: "up", emoji: "👍", label: "Gut" },
+  { value: "down", emoji: "👎", label: "Schlecht" },
+  { value: "unsure", emoji: "😐", label: "Unsicher" },
+];
+
 export default function FeedbackPage() {
   const params = useParams();
   const linkKey = params.linkKey as string;
@@ -33,6 +43,7 @@ export default function FeedbackPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [content, setContent] = useState("");
+  const [rating, setRating] = useState<Rating | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -52,18 +63,25 @@ export default function FeedbackPage() {
     load();
   }, [linkKey]);
 
+  function resetForm() {
+    setContent("");
+    setRating(null);
+    setSubmitted(false);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim() && !rating) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
       await apiFetch(`/api/feedback/${linkKey}`, {
         method: "POST",
-        body: JSON.stringify({ content: content.trim() }),
+        body: JSON.stringify({ content: content.trim() || null, rating }),
       });
       setSubmitted(true);
       setContent("");
+      setRating(null);
     } catch (err: any) {
       setSubmitError(err.message);
     }
@@ -93,6 +111,10 @@ export default function FeedbackPage() {
       </main>
     );
   }
+
+  const availableRatings = RATING_OPTIONS.filter(
+    (r) => r.value !== "unsure" || topic.emoji_unsure_enabled
+  );
 
   return (
     <main className="min-h-screen max-w-xl mx-auto px-5 py-14 md:py-20 animate-fade-in">
@@ -125,7 +147,7 @@ export default function FeedbackPage() {
             einsehen oder ändern.
           </p>
           <button
-            onClick={() => setSubmitted(false)}
+            onClick={resetForm}
             className="rounded-card border border-plum-300 text-plum-700 text-sm font-medium px-4 py-2 hover:bg-plum-100"
           >
             Weiteres Feedback abgeben
@@ -133,12 +155,43 @@ export default function FeedbackPage() {
         </div>
       ) : (
         <form onSubmit={submit} className="animate-fade-in-up">
+          {topic.emoji_rating_enabled && (
+            <div className="mb-4">
+              <p className="text-xs font-medium text-ink/60 mb-2">
+                Deine Einschätzung (optional)
+              </p>
+              <div className="flex gap-2">
+                {availableRatings.map((r) => (
+                  <button
+                    key={r.value}
+                    type="button"
+                    onClick={() =>
+                      setRating((prev) => (prev === r.value ? null : r.value))
+                    }
+                    className={`flex flex-col items-center gap-1 rounded-card border px-5 py-3 text-2xl ${
+                      rating === r.value
+                        ? "border-plum-500 bg-plum-100 scale-105"
+                        : "border-plum-300 bg-white hover:border-plum-500"
+                    }`}
+                  >
+                    <span>{r.emoji}</span>
+                    <span className="text-[10px] font-mono text-ink/50 uppercase">
+                      {r.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <label className="block text-xs font-medium text-ink/60 mb-1">
+            {topic.emoji_rating_enabled ? "Feedback (optional)" : "Dein Feedback"}
+          </label>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Dein Feedback…"
-            rows={8}
-            autoFocus
+            rows={topic.emoji_rating_enabled ? 5 : 8}
             className="w-full rounded-card border border-plum-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-plum-500"
           />
           {submitError && (
@@ -146,15 +199,16 @@ export default function FeedbackPage() {
           )}
           <button
             type="submit"
-            disabled={submitting || !content.trim()}
+            disabled={submitting || (!content.trim() && !rating)}
             className="mt-4 flex items-center gap-2 rounded-card bg-plum-700 text-white text-sm font-semibold px-5 py-2.5 hover:bg-plum-900 hover:shadow-md transition-all disabled:opacity-40"
           >
             <Send size={15} />
             {submitting ? "Wird gesendet…" : "Feedback absenden"}
           </button>
           <p className="text-xs text-ink/40 mt-4">
-            Es werden nur dein Text sowie Datum und Uhrzeit gespeichert -
-            komplett anonym, ohne weitere Angaben zu dir.
+            Es werden nur dein Text{topic.emoji_rating_enabled ? "/deine Bewertung" : ""} sowie
+            Datum und Uhrzeit gespeichert - komplett anonym, ohne weitere
+            Angaben zu dir.
           </p>
         </form>
       )}
