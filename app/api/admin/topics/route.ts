@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       group by t.id
       order by t.created_at desc
     `;
-    return NextResponse.json(rows);
+    return NextResponse.json(rows, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     console.error(err);
     return NextResponse.json(

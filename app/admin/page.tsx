@@ -11,6 +11,8 @@ import {
   MessageSquareText,
   ToggleLeft,
   ToggleRight,
+  FileText,
+  FileCode,
 } from "lucide-react";
 
 type Topic = {
@@ -244,6 +246,96 @@ export default function AdminPage() {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 1500);
     });
+  }
+
+  function triggerDownload(filename: string, content: string, mime: string) {
+    const blob = new Blob([content], { type: `${mime};charset=utf-8;` });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function slugify(s: string): string {
+    return (
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9äöüß]+/g, "-")
+        .replace(/(^-|-$)/g, "") || "thema"
+    );
+  }
+
+  function downloadAsText(topic: Topic, entries: FeedbackEntry[]) {
+    const lines = [
+      topic.title,
+      topic.description ? topic.description : "",
+      "",
+      `${entries.length} Feedback(s)`,
+      "=".repeat(40),
+      "",
+    ];
+    entries.forEach((f, i) => {
+      lines.push(`#${i + 1} - ${formatDateTimeDE(f.created_at)}`);
+      lines.push(f.content);
+      lines.push("");
+      lines.push("-".repeat(40));
+      lines.push("");
+    });
+    triggerDownload(
+      `${slugify(topic.title)}-feedback.txt`,
+      "\uFEFF" + lines.join("\n"),
+      "text/plain"
+    );
+  }
+
+  function escapeHtml(s: string): string {
+    return s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function downloadAsHtml(topic: Topic, entries: FeedbackEntry[]) {
+    const items = entries
+      .map(
+        (f) => `
+      <li class="entry">
+        <p class="content">${escapeHtml(f.content).replace(/\n/g, "<br>")}</p>
+        <p class="meta">${formatDateTimeDE(f.created_at)}</p>
+      </li>`
+      )
+      .join("\n");
+
+    const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>${escapeHtml(topic.title)} - Feedback</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #241F2E; background: #F7F5F2; }
+  h1 { margin-bottom: 4px; }
+  .description { color: #55506080; margin-top: 0; white-space: pre-wrap; }
+  .count { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #7A5AB8; margin: 24px 0 12px; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  .entry { background: #fff; border: 1px solid #E1D7EF; border-radius: 8px; padding: 16px; margin-bottom: 10px; }
+  .content { margin: 0 0 8px; white-space: pre-wrap; }
+  .meta { margin: 0; font-size: 11px; color: #241F2E66; font-family: monospace; }
+</style>
+</head>
+<body>
+  <h1>${escapeHtml(topic.title)}</h1>
+  ${topic.description ? `<p class="description">${escapeHtml(topic.description).replace(/\n/g, "<br>")}</p>` : ""}
+  <p class="count">${entries.length} Feedback(s)</p>
+  <ul>
+    ${items || "<li>Kein Feedback vorhanden.</li>"}
+  </ul>
+</body>
+</html>`;
+
+    triggerDownload(`${slugify(topic.title)}-feedback.html`, html, "text/html");
   }
 
   const selectedTopic = topics.find((t) => t.id === selectedTopicId) ?? null;
@@ -499,10 +591,28 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <p className="font-mono text-[11px] uppercase tracking-widest text-plum-500 mb-2 flex items-center gap-1.5">
-                  <MessageSquareText size={13} /> Feedbacks (
-                  {feedbackEntries.length})
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <p className="font-mono text-[11px] uppercase tracking-widest text-plum-500 flex items-center gap-1.5">
+                    <MessageSquareText size={13} /> Feedbacks (
+                    {feedbackEntries.length})
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => downloadAsText(selectedTopic, feedbackEntries)}
+                      disabled={feedbackEntries.length === 0}
+                      className="flex items-center gap-1.5 rounded-card border border-plum-300 bg-white text-xs font-medium px-2.5 py-1.5 hover:bg-plum-100 disabled:opacity-40"
+                    >
+                      <FileText size={13} /> Text
+                    </button>
+                    <button
+                      onClick={() => downloadAsHtml(selectedTopic, feedbackEntries)}
+                      disabled={feedbackEntries.length === 0}
+                      className="flex items-center gap-1.5 rounded-card border border-plum-300 bg-white text-xs font-medium px-2.5 py-1.5 hover:bg-plum-100 disabled:opacity-40"
+                    >
+                      <FileCode size={13} /> HTML
+                    </button>
+                  </div>
+                </div>
 
                 {feedbackError && (
                   <p className="text-sm text-alert mb-2">{feedbackError}</p>

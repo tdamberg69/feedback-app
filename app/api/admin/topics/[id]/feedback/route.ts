@@ -18,7 +18,7 @@ export async function GET(
       where topic_id = ${params.id}
       order by created_at desc
     `;
-    return NextResponse.json(rows);
+    return NextResponse.json(rows, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     console.error(err);
     return NextResponse.json(
